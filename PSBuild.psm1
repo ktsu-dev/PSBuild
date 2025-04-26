@@ -936,14 +936,11 @@ function Invoke-DotNetRestore {
 
     Write-StepHeader "Restoring Dependencies"
 
-    $cmd = "dotnet restore --locked-mode /p:ConsoleLoggerParameters=""Verbosity=Normal"""
-    Write-Host "Running: $cmd"
-
     # Execute command and stream output directly to console
-    & dotnet restore --locked-mode /p:ConsoleLoggerParameters="Verbosity=Normal" | ForEach-Object {
+    & dotnet restore --locked-mode -logger:"Microsoft.Build.Logging.ConsoleLogger,Microsoft.Build;Summary;ForceNoAlign;ShowTimestamp;ShowCommandLine;Verbosity=normal" | ForEach-Object {
         Write-Host $_
     }
-    Assert-LastExitCode "Restore failed" -Command $cmd
+    Assert-LastExitCode "Restore failed"
 }
 
 function Invoke-DotNetBuild {
@@ -991,7 +988,7 @@ function Invoke-DotNetBuild {
                     Write-Host "  - $($proj.FullName)" -ForegroundColor Cyan
                 }
 
-                Assert-LastExitCode "Build failed" -Command $cmd
+                Assert-LastExitCode "Build failed"
             }
         }
     }
@@ -1024,7 +1021,7 @@ function Invoke-DotNetTest {
     & dotnet test -m:1 --configuration $Configuration -logger:"Microsoft.Build.Logging.ConsoleLogger,Microsoft.Build;Summary;ForceNoAlign;ShowTimestamp;ShowCommandLine;Verbosity=normal" --no-build --collect:"XPlat Code Coverage" --results-directory $CoverageOutputPath | ForEach-Object {
         Write-Host $_
     }
-    Assert-LastExitCode "Tests failed" -Command $cmd
+    Assert-LastExitCode "Tests failed"
 }
 
 function Invoke-DotNetPack {
