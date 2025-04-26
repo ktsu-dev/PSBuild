@@ -76,7 +76,8 @@ function Get-BuildConfiguration {
     $SHOULD_RELEASE = ($IS_MAIN -AND -NOT $IS_TAGGED -AND $IS_OFFICIAL)
 
     # Check for .csx files (dotnet-script)
-    $USE_DOTNET_SCRIPT = (Get-ChildItem -Path $WorkspacePath -Recurse -Filter *.csx).Count -gt 0
+    $csx = @(Get-ChildItem -Path $WorkspacePath -Recurse -Filter *.csx -ErrorAction SilentlyContinue)
+    $USE_DOTNET_SCRIPT = $csx.Count -gt 0
 
     # Setup paths
     $OUTPUT_PATH = Join-Path $WorkspacePath 'output'
@@ -129,9 +130,12 @@ function Get-GitTags {
     git config versionsort.suffix "-rc"
     git config versionsort.suffix "-pre"
 
-    $tags = git tag --list --sort=-v:refname
-    if ($null -eq $tags) {
-        return @('v1.0.0-pre.0') # Default return if no tags exist
+    # Get tags and ensure we return an array
+    $tags = @(git tag --list --sort=-v:refname)
+
+    # Return default if no tags exist
+    if ($null -eq $tags -or $tags.Count -eq 0) {
+        return @('v1.0.0-pre.0')
     }
 
     return $tags
@@ -225,7 +229,9 @@ function Get-VersionInfoFromGit {
 
     # Get tag information
     $allTags = Get-GitTags
-    $noTagsExist = ($allTags.Count -eq 1 -and $allTags[0] -eq 'v1.0.0-pre.0')
+    $noTagsExist = ($null -eq $allTags) -or
+                   (($allTags -is [string]) -and $allTags -eq 'v1.0.0-pre.0') -or
+                   (($allTags -is [array]) -and $allTags.Count -eq 1 -and $allTags[0] -eq 'v1.0.0-pre.0')
 
     if ($noTagsExist) {
         # Special case: This is the first version, no real tags exist yet
@@ -680,10 +686,16 @@ function New-Changelog {
     $tagIndex = 0
 
     # Add entry for current/new version
-    $previousTag = if ($null -eq $tags -or $tags.Length -eq 0) {
+    $previousTag = if ($null -eq $tags -or
+                      ($tags -is [string]) -or
+                      (($tags -is [array]) -and $tags.Length -eq 0)) {
         'v0.0.0'
     } else {
-        $tags[0]
+        if ($tags -is [array]) {
+            $tags[0]
+        } else {
+            $tags
+        }
     }
 
     $currentTag = "v$Version"
@@ -832,7 +844,9 @@ function Invoke-DotNetRestore {
     param()
 
     Write-StepHeader "Restoring Dependencies"
-    dotnet restore --locked-mode
+
+    # Execute command and let output flow to console for GitHub logs
+    & dotnet restore --locked-mode
     Assert-LastExitCode "Restore failed"
 }
 
@@ -854,7 +868,9 @@ function Invoke-DotNetBuild {
     )
 
     Write-StepHeader "Building Solution"
-    dotnet build --configuration $Configuration --verbosity normal --no-incremental $BuildArgs --no-restore
+
+    # Execute command and let output flow to console for GitHub logs
+    & dotnet build --configuration $Configuration --verbosity normal --no-incremental $BuildArgs --no-restore
     Assert-LastExitCode "Build failed"
 }
 
@@ -876,7 +892,9 @@ function Invoke-DotNetTest {
     )
 
     Write-StepHeader "Running Tests"
-    dotnet test -m:1 --configuration $Configuration --verbosity normal --no-build --collect:"XPlat Code Coverage" --results-directory $CoverageOutputPath
+
+    # Execute command and let output flow to console for GitHub logs
+    & dotnet test -m:1 --configuration $Configuration --verbosity normal --no-build --collect:"XPlat Code Coverage" --results-directory $CoverageOutputPath
     Assert-LastExitCode "Tests failed"
 }
 
@@ -890,12 +908,18 @@ function Invoke-DotNetPack {
         The build configuration (Debug/Release).
     .PARAMETER OutputPath
         The path to output packages to.
+    .PARAMETER Verbosity
+        The verbosity level for dotnet commands. Defaults to "normal".
+    .PARAMETER Project
+        Optional specific project to package. If not provided, all projects are packaged.
     #>
     [CmdletBinding()]
     param (
         [string]$Configuration = "Release",
         [Parameter(Mandatory=$true)]
-        [string]$OutputPath
+        [string]$OutputPath,
+        [string]$Verbosity = "normal",
+        [string]$Project = ""
     )
 
     Write-StepHeader "Packaging Libraries"
@@ -903,8 +927,46 @@ function Invoke-DotNetPack {
     # Ensure output directory exists
     New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
 
-    dotnet pack --configuration $Configuration --no-build --output $OutputPath
-    Assert-LastExitCode "Library packaging failed"
+    # Check if any projects exist
+    $projectFiles = @(Get-ChildItem -Recurse -Filter *.csproj -ErrorAction SilentlyContinue)
+    if ($projectFiles.Count -eq 0) {
+        Write-Warning "No .csproj files found. Skipping packaging step."
+        return
+    }
+
+    try {
+        # Build either a specific project or all projects
+        if ([string]::IsNullOrWhiteSpace($Project)) {
+            Write-Verbose "Packaging all projects in solution"
+            & dotnet pack --configuration $Configuration --no-build --output $OutputPath --verbosity $Verbosity
+        } else {
+            Write-Verbose "Packaging project: $Project"
+            & dotnet pack $Project --configuration $Configuration --no-build --output $OutputPath --verbosity $Verbosity
+        }
+
+        if ($LASTEXITCODE -ne 0) {
+            # Get more details about what might have failed
+            Write-Error "Packaging failed with exit code $LASTEXITCODE, trying again with detailed verbosity..."
+            & dotnet pack --configuration $Configuration --no-build --output $OutputPath --verbosity detailed
+            throw "Library packaging failed with exit code $LASTEXITCODE"
+        }
+
+        # Verify if any packages were created
+        $packages = @(Get-ChildItem -Path $OutputPath -Filter *.nupkg -ErrorAction SilentlyContinue)
+        if ($packages.Count -eq 0) {
+            Write-Warning "No packages were created. Check project configurations."
+        } else {
+            Write-Host "Created $($packages.Count) packages in $OutputPath"
+            foreach ($package in $packages) {
+                Write-Host "  - $($package.Name)"
+            }
+        }
+    }
+    catch {
+        $originalException = $_.Exception
+        Write-Error "Package creation failed: $originalException"
+        throw "Library packaging failed: $originalException"
+    }
 }
 
 function Invoke-DotNetPublish {
@@ -951,8 +1013,13 @@ function Invoke-DotNetPublish {
     New-Item -Path $StagingPath -ItemType Directory -Force | Out-Null
 
     # Find all projects and publish them
-    Get-ChildItem -Recurse -Filter *.csproj | ForEach-Object {
-        $csproj = $_
+    $projectFiles = @(Get-ChildItem -Recurse -Filter *.csproj -ErrorAction SilentlyContinue)
+    if ($projectFiles.Count -eq 0) {
+        Write-Warning "No .csproj files found. Skipping application publishing step."
+        return
+    }
+
+    foreach ($csproj in $projectFiles) {
         $projName = [System.IO.Path]::GetFileNameWithoutExtension($csproj)
         $outDir = Join-Path $OutputPath $projName
         $stageFile = Join-Path $StagingPath "$projName-$Version.zip"
@@ -963,7 +1030,7 @@ function Invoke-DotNetPublish {
         New-Item -Path $outDir -ItemType Directory -Force | Out-Null
 
         # Publish application
-        dotnet publish $csproj --no-build --configuration $Configuration --framework net$DotnetVersion --output $outDir
+        & dotnet publish $csproj --no-build --configuration $Configuration --framework net$DotnetVersion --output $outDir --verbosity normal
         Assert-LastExitCode "Application publish failed for $projName"
 
         # Create zip archive
@@ -1016,14 +1083,24 @@ function Invoke-NuGetPublish {
     # Publish to GitHub Packages if enabled
     if (-not $SkipGithub) {
         Write-StepHeader "Publishing to GitHub Packages"
-        dotnet nuget push $PackagePattern --api-key $GithubToken --source "https://nuget.pkg.github.com/$GithubOwner/index.json" --skip-duplicate
+
+        # Display the command being run (without revealing the token)
+        Write-Host "Running: dotnet nuget push $PackagePattern --source https://nuget.pkg.github.com/$GithubOwner/index.json --skip-duplicate"
+
+        # Execute the command
+        & dotnet nuget push $PackagePattern --api-key $GithubToken --source "https://nuget.pkg.github.com/$GithubOwner/index.json" --skip-duplicate
         Assert-LastExitCode "GitHub package publish failed"
     }
 
     # Publish to NuGet.org if enabled and key provided
     if (-not $SkipNuGet -and $NuGetApiKey) {
         Write-StepHeader "Publishing to NuGet.org"
-        dotnet nuget push $PackagePattern --api-key $NuGetApiKey --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+
+        # Display the command being run (without revealing the API key)
+        Write-Host "Running: dotnet nuget push $PackagePattern --source https://api.nuget.org/v3/index.json --skip-duplicate"
+
+        # Execute the command
+        & dotnet nuget push $PackagePattern --api-key $NuGetApiKey --source "https://api.nuget.org/v3/index.json" --skip-duplicate
         Assert-LastExitCode "NuGet.org package publish failed"
     }
 }
@@ -1235,6 +1312,8 @@ function Invoke-ReleaseWorkflow {
         The GitHub token for authentication.
     .PARAMETER NuGetApiKey
         Optional NuGet.org API key.
+    .PARAMETER SkipPackages
+        If set to true, skips NuGet package generation and publishing. Default is false.
     #>
     [CmdletBinding()]
     param (
@@ -1251,27 +1330,84 @@ function Invoke-ReleaseWorkflow {
         [PSCustomObject]$BuildConfig,
         [Parameter(Mandatory=$true)]
         [string]$GithubToken,
-        [string]$NuGetApiKey
+        [string]$NuGetApiKey,
+        [switch]$SkipPackages = $false
     )
 
     try {
+        Write-StepHeader "Starting Release Workflow"
+
         # Generate Metadata
+        Write-Host "Generating version information..."
         $versionInfo = Get-VersionInfoFromGit -CommitHash $GitSha
 
         # Update and commit all metadata files
+        Write-Host "Updating metadata files..."
         $releaseHash = Update-ProjectMetadata -Version $versionInfo.Version -CommitHash $GitSha -GitHubOwner $Owner -GitHubRepo $Repository
 
-        # Package
-        Invoke-DotNetPack -Configuration $Configuration -OutputPath $BuildConfig.StagingPath
-        Invoke-DotNetPublish -Configuration $Configuration -OutputPath $BuildConfig.OutputPath -StagingPath $BuildConfig.StagingPath -Version $versionInfo.Version -DotnetVersion $BuildConfig.DotnetVersion
+        # Check if we have any project files before attempting to package
+        $hasProjects = Test-Path -Path "*.csproj" -Recurse
 
-        # Publish
-        Invoke-NuGetPublish -PackagePattern $BuildConfig.PackagePattern -GithubToken $GithubToken -GithubOwner $Owner -NuGetApiKey $NuGetApiKey
+        if (-not $hasProjects) {
+            Write-Warning "No .NET projects found in repository. Skipping packaging steps."
+            $SkipPackages = $true
+        }
 
-        # Create Release
-        $assetPatterns = @($BuildConfig.PackagePattern, $BuildConfig.SymbolsPattern, $BuildConfig.ApplicationPattern)
-        New-GitHubRelease -Version $versionInfo.Version -CommitHash $releaseHash -GithubToken $GithubToken -AssetPatterns $assetPatterns
+        # Package and publish if not skipped
+        $packagePaths = @()
+        if (-not $SkipPackages) {
+            # Create NuGet packages
+            try {
+                Write-Host "Packaging libraries..."
+                Invoke-DotNetPack -Configuration $Configuration -OutputPath $BuildConfig.StagingPath -Verbosity "detailed"
 
+                # Add package paths if they exist
+                if (Test-Path $BuildConfig.PackagePattern) {
+                    $packagePaths += $BuildConfig.PackagePattern
+                }
+                if (Test-Path $BuildConfig.SymbolsPattern) {
+                    $packagePaths += $BuildConfig.SymbolsPattern
+                }
+            }
+            catch {
+                Write-Warning "Library packaging failed: $_"
+                Write-Warning "Continuing with release process without NuGet packages."
+            }
+
+            # Create application packages
+            try {
+                Write-Host "Publishing applications..."
+                Invoke-DotNetPublish -Configuration $Configuration -OutputPath $BuildConfig.OutputPath -StagingPath $BuildConfig.StagingPath -Version $versionInfo.Version -DotnetVersion $BuildConfig.DotnetVersion
+
+                # Add application paths if they exist
+                if (Test-Path $BuildConfig.ApplicationPattern) {
+                    $packagePaths += $BuildConfig.ApplicationPattern
+                }
+            }
+            catch {
+                Write-Warning "Application publishing failed: $_"
+                Write-Warning "Continuing with release process without application packages."
+            }
+
+            # Publish packages if we have any and NuGet key is provided
+            $packages = @(Get-Item -Path $BuildConfig.PackagePattern -ErrorAction SilentlyContinue)
+            if ($packages.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($NuGetApiKey)) {
+                Write-Host "Publishing NuGet packages..."
+                try {
+                    Invoke-NuGetPublish -PackagePattern $BuildConfig.PackagePattern -GithubToken $GithubToken -GithubOwner $Owner -NuGetApiKey $NuGetApiKey
+                }
+                catch {
+                    Write-Warning "NuGet package publishing failed: $_"
+                    Write-Warning "Continuing with release process."
+                }
+            }
+        }
+
+        # Create GitHub release
+        Write-Host "Creating GitHub release for version $($versionInfo.Version)..."
+        New-GitHubRelease -Version $versionInfo.Version -CommitHash $releaseHash -GithubToken $GithubToken -AssetPatterns $packagePaths
+
+        Write-Host "Release process completed successfully!" -ForegroundColor Green
         return @{
             Version = $versionInfo.Version
             ReleaseHash = $releaseHash
@@ -1282,7 +1418,8 @@ function Invoke-ReleaseWorkflow {
         Write-Error "Release workflow failed: $_"
         return @{
             Success = $false
-            Error = $_
+            Error = $_.ToString()
+            StackTrace = $_.ScriptStackTrace
         }
     }
 }
