@@ -1,146 +1,114 @@
-# PSBuild PowerShell Module
+# Builder
 
-A comprehensive PowerShell module for building, testing, packaging, and releasing .NET applications.
+A comprehensive .NET library and CLI tool for automating the build, test, package, and release process for .NET applications using Git-based versioning.
+
+This is a .NET port of the original PowerShell Builder module.
 
 ## Features
 
-- Environment setup and configuration
-- Semantic versioning with Git history analysis
-- License and changelog generation
-- Automated metadata management
-- Build, test, and package .NET applications
-- NuGet package publishing
-- GitHub release creation
-- Complete CI/CD pipeline
+- Semantic versioning based on git history and commit messages
+- Automatic version calculation from commit analysis
+- Metadata file generation and management
+- Comprehensive build, test, and package pipeline
+- NuGet package creation and publishing
+- GitHub release creation with assets
+- Proper line ending handling based on git config
+
+## Installation
+
+### Via .NET CLI
+
+```bash
+dotnet tool install --global Builder.CLI
+```
+
+### Manual
+
+1. Clone the repository
+2. Build the solution: `dotnet build -c Release`
+3. Install the CLI tool: `dotnet tool install --global --add-source ./src/Builder.CLI/bin/Release Builder.CLI`
 
 ## Usage
 
-### Basic Usage
+### Command Line
 
-```powershell
-# Import the module
-Import-Module ./PSBuild.psm1
+```bash
+# Get version information from git history
+builder version get
 
-# Initialize the build environment
-Initialize-BuildEnvironment
+# Set a specific version
+builder version set 1.2.3
 
-# Get the build configuration
-$config = Get-BuildConfiguration -GitRef "refs/heads/main" -GitSha "abc123" -WorkspacePath "C:/projects/myapp" -GithubToken $env:GITHUB_TOKEN
+# Initialize build environment
+builder init
 
-# Run the build workflow
-Invoke-BuildWorkflow -BuildConfig $config
+# Build a project
+builder build --configuration Release
 ```
 
-### Version Management
+### API
 
-```powershell
-# Get comprehensive version information from Git history
-$versionInfo = Get-VersionInfoFromGit -CommitHash "abc123"
+```csharp
+// Add Builder to your services
+services.AddBuilder();
 
-# Access version information
-Write-Host "New version: $($versionInfo.Version)"
-Write-Host "Previous version: $($versionInfo.LastVersion)"
-Write-Host "Version increment type: $($versionInfo.VersionIncrement)"
+// Use the build manager
+var buildManager = serviceProvider.GetRequiredService<BuildManager>();
+buildManager.InitializeBuildEnvironment();
 
-# Generate version file and set environment variables
-$version = New-Version -CommitHash "abc123"
+// Use the version manager
+var versionManager = serviceProvider.GetRequiredService<VersionManager>();
+var versionInfo = versionManager.GetVersionInfoFromGit("/path/to/repo");
 ```
 
-### Metadata Management
+## Build Configuration
 
-```powershell
-# Update and commit all metadata files (comprehensive approach)
-$releaseHash = Update-ProjectMetadata `
-  -Version "1.2.3" `
-  -CommitHash "abc123" `
-  -GitHubOwner "myorg" `
-  -GitHubRepo "myrepo" `
-  -ServerUrl "https://github.com"
+The `BuildManager.GetBuildConfigurationAsync` method returns a configuration object with the following key properties:
 
-# Individual metadata operations
-# Create just a license file
-New-License -ServerUrl "https://github.com" -Owner "myorg" -Repository "myrepo"
+| Property | Description |
+|----------|-------------|
+| IsOfficial | Whether this is an official repository build |
+| IsMain | Whether building from main branch |
+| IsTagged | Whether the current commit is tagged |
+| ShouldRelease | Whether a release should be created |
+| UseDotnetScript | Whether .NET script files are present |
+| OutputPath | Path for build outputs |
+| StagingPath | Path for staging artifacts |
+| PackagePattern | Pattern for NuGet packages |
+| SymbolsPattern | Pattern for symbol packages |
+| ApplicationPattern | Pattern for application archives |
+| Version | Current version number |
+| ReleaseHash | Hash of the release commit |
 
-# Create just a changelog
-New-Changelog -Version "1.2.3" -CommitHash "abc123"
-```
+## Version Control
 
-### Complete CI/CD Pipeline
+### Version Tags
 
-```powershell
-# Run the entire CI/CD pipeline
-$result = Invoke-CIPipeline `
-  -GitRef "refs/heads/main" `
-  -GitSha "abc123" `
-  -WorkspacePath "C:/projects/myapp" `
-  -ServerUrl "https://github.com" `
-  -Owner "myorg" `
-  -Repository "myrepo" `
-  -GithubToken $env:GITHUB_TOKEN `
-  -NuGetApiKey $env:NUGET_API_KEY
+Commits can include the following tags to control version increments:
 
-# Check the result
-if ($result.BuildSuccess) {
-    Write-Host "Build successful!"
-    if ($result.ReleaseSuccess) {
-        Write-Host "Release successful! Version: $($result.Version)"
-    }
-}
-```
+| Tag | Description | Example |
+|-----|-------------|---------|
+| [major] | Triggers a major version increment | 2.0.0 |
+| [minor] | Triggers a minor version increment | 1.2.0 |
+| [patch] | Triggers a patch version increment | 1.1.2 |
+| [pre] | Creates/increments pre-release version | 1.1.2-pre.1 |
 
-### Key Functions
+### Automatic Version Calculation
 
-The module provides many individual functions that can be used separately:
+The library analyzes commit history to determine appropriate version increments:
 
-- **Version Management**
-  - `Get-VersionInfoFromGit` - Gets comprehensive version information based on Git history
-  - `Get-VersionType` - Determines the type of version increment based on commit history
-  - `New-Version` - Generates a version file and sets environment variables
+1. Checks for explicit version tags in commit messages
+2. Analyzes code changes vs. documentation changes
+3. Considers the scope and impact of changes
+4. Maintains semantic versioning principles
 
-- **Metadata Management**
-  - `Update-ProjectMetadata` - Updates and commits all metadata files
-  - `New-License` - Creates a license file
-  - `New-Changelog` - Generates a changelog from Git commits
+## Contributing
 
-- **.NET Operations**
-  - `Invoke-DotNetRestore` - Restores NuGet packages
-  - `Invoke-DotNetBuild` - Builds the .NET solution
-  - `Invoke-DotNetTest` - Runs unit tests with coverage
-  - `Invoke-DotNetPack` - Creates NuGet packages
-  - `Invoke-DotNetPublish` - Publishes applications and creates zip archives
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes with appropriate version tags
+4. Create a pull request
 
-- **Publishing and Release**
-  - `Invoke-NuGetPublish` - Publishes packages to NuGet feeds
-  - `New-GitHubRelease` - Creates a GitHub release
+## License
 
-## Workflow Integration
-
-This module can be used in any CI/CD system, including GitHub Actions, by importing it in your PowerShell scripts.
-
-For GitHub Actions, you can use it like this:
-
-```yaml
-- name: Run Build
-  shell: pwsh
-  run: |
-    Import-Module ./scripts/PSBuild.psm1
-
-    # Get build configuration
-    $config = Get-BuildConfiguration -GitRef "${{ github.ref }}" -GitSha "${{ github.sha }}" -WorkspacePath "${{ github.workspace }}" -GithubToken "${{ github.token }}"
-
-    # Run build workflow
-    $buildResult = Invoke-BuildWorkflow -BuildConfig $config
-
-    # Generate version and metadata if releasing
-    if ($config.ShouldRelease) {
-        $versionInfo = Get-VersionInfoFromGit -CommitHash "${{ github.sha }}"
-        $releaseHash = Update-ProjectMetadata -Version $versionInfo.Version -CommitHash "${{ github.sha }}" -GitHubOwner "${{ github.repository_owner }}" -GitHubRepo "${{ github.repository }}"
-    }
-```
-
-## Requirements
-
-- PowerShell 5.1 or higher
-- .NET SDK
-- Git
-- GitHub CLI (for release creation)
+MIT License - See LICENSE.md for details
