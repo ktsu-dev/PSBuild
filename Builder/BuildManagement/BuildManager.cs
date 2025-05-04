@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.BuildManagement;
 
 using Microsoft.Extensions.Logging;
@@ -46,14 +50,14 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 		ArgumentNullException.ThrowIfNull(options);
 
 		// Determine if this is an official repo (verify owner and ensure it's not a fork)
-		bool isOfficial = false;
+		var isOfficial = false;
 		if (!string.IsNullOrEmpty(options.GithubToken))
 		{
 			try
 			{
 				var client = new GitHubClient(new ProductHeaderValue("PSBuild"))
 				{
-					Credentials = new Octokit.Credentials(options.GithubToken)
+					Credentials = new Credentials(options.GithubToken)
 				};
 
 				var repo = await client.Repository.Get(options.GitHubOwner, options.GitHubRepo).ConfigureAwait(false);
@@ -70,30 +74,30 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 		_logger.LogInformation($"Is Official: {isOfficial}");
 
 		// Determine if this is main branch and not tagged
-		bool isMain = options.GitRef == "refs/heads/main";
+		var isMain = options.GitRef == "refs/heads/main";
 
-		bool isTagged = false;
+		var isTagged = false;
 		using (var repo = new LibGit2Sharp.Repository(options.WorkspacePath))
 		{
 			isTagged = repo.Tags.Any(tag => tag.Target.Sha == options.GitSha);
 		}
 
-		bool shouldRelease = isMain && !isTagged && isOfficial;
+		var shouldRelease = isMain && !isTagged && isOfficial;
 
 		// Check for .csx files (dotnet-script)
-		bool useDotnetScript = Directory.GetFiles(options.WorkspacePath, "*.csx", SearchOption.AllDirectories).Length > 0;
+		var useDotnetScript = Directory.GetFiles(options.WorkspacePath, "*.csx", SearchOption.AllDirectories).Length > 0;
 
 		// Setup paths
-		string outputPath = Path.Combine(options.WorkspacePath, "output");
-		string stagingPath = Path.Combine(options.WorkspacePath, "staging");
+		var outputPath = Path.Combine(options.WorkspacePath, "output");
+		var stagingPath = Path.Combine(options.WorkspacePath, "staging");
 
 		// Setup artifact patterns
-		string packagePattern = Path.Combine(stagingPath, "*.nupkg");
-		string symbolsPattern = Path.Combine(stagingPath, "*.snupkg");
-		string applicationPattern = Path.Combine(stagingPath, "*.zip");
+		var packagePattern = Path.Combine(stagingPath, "*.nupkg");
+		var symbolsPattern = Path.Combine(stagingPath, "*.snupkg");
+		var applicationPattern = Path.Combine(stagingPath, "*.zip");
 
 		// Set build arguments
-		string buildArgs = useDotnetScript ? "-maxCpuCount:1" : "";
+		var buildArgs = useDotnetScript ? "-maxCpuCount:1" : "";
 
 		// Create configuration object
 		var config = new BuildConfiguration
@@ -142,8 +146,8 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 		{
 			_logger.LogInformation("Restoring NuGet packages");
 
-			string targetPath = projectOrSolutionPath ?? "";
-			string arguments = $"restore {targetPath}";
+			var targetPath = projectOrSolutionPath ?? "";
+			var arguments = $"restore {targetPath}";
 
 			var result = _commandRunner.RunCommand("dotnet", arguments, config.WorkspacePath);
 
@@ -181,8 +185,8 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 		{
 			_logger.LogInformation($"Building solution in {configuration} configuration");
 
-			string targetPath = projectOrSolutionPath ?? "";
-			string output = outputPath ?? config.OutputPath;
+			var targetPath = projectOrSolutionPath ?? "";
+			var output = outputPath ?? config.OutputPath;
 
 			// Create the output directory if it doesn't exist
 			if (!string.IsNullOrEmpty(output) && !Directory.Exists(output))
@@ -190,7 +194,7 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 				Directory.CreateDirectory(output);
 			}
 
-			string arguments = $"build {targetPath} --configuration {configuration}";
+			var arguments = $"build {targetPath} --configuration {configuration}";
 
 			if (!string.IsNullOrEmpty(output))
 			{
@@ -238,9 +242,9 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 		{
 			_logger.LogInformation($"Running tests in {configuration} configuration");
 
-			string targetPath = projectOrSolutionPath ?? "";
+			var targetPath = projectOrSolutionPath ?? "";
 
-			string arguments = $"test {targetPath} --configuration {configuration} --no-build";
+			var arguments = $"test {targetPath} --configuration {configuration} --no-build";
 
 			if (collectCoverage)
 			{
@@ -293,7 +297,7 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 				Directory.CreateDirectory(config.StagingPath);
 			}
 
-			string arguments = $"pack {projectPath} --configuration {configuration} --no-build --output {config.StagingPath}";
+			var arguments = $"pack {projectPath} --configuration {configuration} --no-build --output {config.StagingPath}";
 
 			if (includeSymbols)
 			{
@@ -356,7 +360,7 @@ public class BuildManager(ILogger<BuildManager> logger, CommandRunner commandRun
 				Directory.CreateDirectory(config.OutputPath);
 			}
 
-			string arguments = $"publish {projectPath} --configuration {configuration} --output {config.OutputPath}";
+			var arguments = $"publish {projectPath} --configuration {configuration} --output {config.OutputPath}";
 
 			if (!string.IsNullOrEmpty(runtime))
 			{

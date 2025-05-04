@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.BuildManagement;
 
 using Microsoft.Extensions.Logging;
@@ -94,7 +98,7 @@ public class BuildWorkflow(
 				_logger.LogInformation("Running Pester tests");
 
 				// Get test directory
-				string testDir = Path.Combine(config.WorkspacePath, "Tests");
+				var testDir = Path.Combine(config.WorkspacePath, "Tests");
 				if (Directory.Exists(testDir))
 				{
 					var testResult = _commandRunner.RunCommand(
@@ -117,7 +121,7 @@ public class BuildWorkflow(
 			}
 
 			// Create release artifacts
-			string modulePath = Path.Combine(config.WorkspacePath, moduleName);
+			var modulePath = Path.Combine(config.WorkspacePath, moduleName);
 			var artifacts = _releaseManager.CreateReleaseArtifacts(config, modulePath, config.Version);
 
 			if (artifacts.Count == 0)
@@ -211,14 +215,14 @@ public class BuildWorkflow(
 			}
 
 			// Extract release notes from changelog
-			string releaseNotes = _releaseManager.ExtractReleaseNotes(config, tagVersion);
+			var releaseNotes = _releaseManager.ExtractReleaseNotes(config, tagVersion);
 
 			// Create GitHub release if token is available
 			if (!string.IsNullOrEmpty(config.GithubToken))
 			{
 				// Find all assets to include in the release
-				string[] assetPatterns = config.AssetPatterns.Select(pattern =>
-					Path.Combine(config.StagingPath, pattern)).ToArray();
+				string[] assetPatterns = [.. config.AssetPatterns.Select(pattern =>
+					Path.Combine(config.StagingPath, pattern))];
 
 				var release = await _releaseManager.CreateGitHubReleaseAsync(
 					config,
@@ -242,10 +246,10 @@ public class BuildWorkflow(
 			// Publish to NuGet if requested
 			if (publishToNuGet && !string.IsNullOrEmpty(config.NuGetApiKey))
 			{
-				string[] nugetPackages = Directory.GetFiles(config.StagingPath, "*.nupkg");
+				var nugetPackages = Directory.GetFiles(config.StagingPath, "*.nupkg");
 				if (nugetPackages.Length > 0)
 				{
-					bool success = await _releaseManager.PublishNuGetPackagesAsync(
+					var success = await _releaseManager.PublishNuGetPackagesAsync(
 						config,
 						[Path.Combine(config.StagingPath, "*.nupkg")],
 						config.NuGetApiKey).ConfigureAwait(false);
@@ -268,13 +272,13 @@ public class BuildWorkflow(
 			if (publishToPSGallery && !string.IsNullOrEmpty(config.NuGetApiKey))
 			{
 				// Find PowerShell module directories
-				string[] psd1Files = Directory.GetFiles(config.WorkspacePath, "*.psd1", SearchOption.AllDirectories);
-				foreach (string psd1File in psd1Files)
+				var psd1Files = Directory.GetFiles(config.WorkspacePath, "*.psd1", SearchOption.AllDirectories);
+				foreach (var psd1File in psd1Files)
 				{
-					string? modulePath = Path.GetDirectoryName(psd1File);
+					var modulePath = Path.GetDirectoryName(psd1File);
 					if (modulePath != null)
 					{
-						bool success = _releaseManager.PublishToPowerShellGallery(
+						var success = _releaseManager.PublishToPowerShellGallery(
 							config,
 							modulePath,
 							config.NuGetApiKey);

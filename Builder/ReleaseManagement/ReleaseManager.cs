@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.ReleaseManagement;
 
 using System.IO.Compression;
@@ -38,7 +42,7 @@ public partial class ReleaseManager(
 	/// <param name="nugetApiKey">The NuGet API key to use for publishing.</param>
 	/// <param name="nugetSource">The NuGet source to publish to.</param>
 	/// <returns>A task representing the asynchronous operation, with a value indicating whether the operation succeeded.</returns>
-	public async Task<bool> PublishNuGetPackagesAsync(
+	public Task<bool> PublishNuGetPackagesAsync(
 		BuildConfiguration config,
 		string[] packagePatterns,
 		string nugetApiKey,
@@ -49,25 +53,25 @@ public partial class ReleaseManager(
 		if (string.IsNullOrEmpty(nugetApiKey))
 		{
 			_logger.LogError("NuGet API key is required");
-			return false;
+			return Task.FromResult(false);
 		}
 
 		// Verify that we have at least one package to publish
 		var packages = new List<string>();
-		foreach (string pattern in packagePatterns)
+		foreach (var pattern in packagePatterns)
 		{
-			string[] matches = Directory.GetFiles(Path.GetDirectoryName(pattern) ?? config.WorkspacePath, Path.GetFileName(pattern));
+			var matches = Directory.GetFiles(Path.GetDirectoryName(pattern) ?? config.WorkspacePath, Path.GetFileName(pattern));
 			packages.AddRange(matches);
 		}
 
 		if (packages.Count == 0)
 		{
 			_logger.LogError("No packages found to publish");
-			return false;
+			return Task.FromResult(false);
 		}
 
 		// Publish each package
-		foreach (string package in packages)
+		foreach (var package in packages)
 		{
 			_logger.LogInformation($"Publishing {Path.GetFileName(package)}");
 
@@ -82,18 +86,18 @@ public partial class ReleaseManager(
 				if (result.ExitCode != 0)
 				{
 					_logger.LogError($"Failed to publish {package}: {result.Error}");
-					return false;
+					return Task.FromResult(false);
 				}
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError($"Error publishing {package}: {ex.Message}");
-				return false;
+				return Task.FromResult(false);
 			}
 		}
 
 		_logger.LogInformation($"Successfully published {packages.Count} packages");
-		return true;
+		return Task.FromResult(true);
 	}
 
 	/// <summary>
@@ -151,15 +155,15 @@ public partial class ReleaseManager(
 			_logger.LogInformation($"Created release {release.Name}");
 
 			// Upload assets
-			foreach (string assetPattern in assets)
+			foreach (var assetPattern in assets)
 			{
-				string[] assetFiles = Directory.GetFiles(Path.GetDirectoryName(assetPattern) ?? config.WorkspacePath, Path.GetFileName(assetPattern));
-				foreach (string assetFile in assetFiles)
+				var assetFiles = Directory.GetFiles(Path.GetDirectoryName(assetPattern) ?? config.WorkspacePath, Path.GetFileName(assetPattern));
+				foreach (var assetFile in assetFiles)
 				{
 					_logger.LogInformation($"Uploading asset {Path.GetFileName(assetFile)}");
 
 					using var stream = File.OpenRead(assetFile);
-					string contentType = GetContentType(assetFile);
+					var contentType = GetContentType(assetFile);
 					var assetUpload = new ReleaseAssetUpload
 					{
 						FileName = Path.GetFileName(assetFile),
@@ -214,8 +218,8 @@ public partial class ReleaseManager(
 			}
 
 			// Determine module name from directory name
-			string moduleName = Path.GetFileName(modulePath);
-			string zipFilePath = Path.Combine(outputPath, $"{moduleName}-{version}.zip");
+			var moduleName = Path.GetFileName(modulePath);
+			var zipFilePath = Path.Combine(outputPath, $"{moduleName}-{version}.zip");
 
 			// Delete the ZIP file if it already exists
 			if (File.Exists(zipFilePath))
@@ -231,10 +235,10 @@ public partial class ReleaseManager(
 			// Sign the package if requested
 			if (signPackage)
 			{
-				string signatureFilePath = $"{zipFilePath}.signature";
+				var signatureFilePath = $"{zipFilePath}.signature";
 
 				// Compute hash of the ZIP file
-				string fileHash = ComputeFileHash(zipFilePath);
+				var fileHash = ComputeFileHash(zipFilePath);
 
 				// Write hash to signature file
 				File.WriteAllText(signatureFilePath, fileHash);
@@ -280,7 +284,7 @@ public partial class ReleaseManager(
 		try
 		{
 			// Use PowerShellGet's Publish-Module command to publish to PSGallery
-			string psCommand = $"Publish-Module -Path '{modulePath}' -NuGetApiKey '{apiKey}' -Verbose";
+			var psCommand = $"Publish-Module -Path '{modulePath}' -NuGetApiKey '{apiKey}' -Verbose";
 
 			// Execute the PowerShell command
 			var result = _commandRunner.RunCommand(
@@ -333,13 +337,13 @@ public partial class ReleaseManager(
 			// Create ZIP package if requested
 			if (includeZip)
 			{
-				string? zipPath = CreateModuleZipPackage(config, modulePath, config.StagingPath, version);
+				var zipPath = CreateModuleZipPackage(config, modulePath, config.StagingPath, version);
 				if (zipPath != null)
 				{
 					artifacts.Add(zipPath);
 
 					// Also add the signature file if it exists
-					string signatureFilePath = $"{zipPath}.signature";
+					var signatureFilePath = $"{zipPath}.signature";
 					if (File.Exists(signatureFilePath))
 					{
 						artifacts.Add(signatureFilePath);
@@ -348,16 +352,16 @@ public partial class ReleaseManager(
 			}
 
 			// Create module manifest verification report
-			string manifestReport = VerifyModuleManifest(modulePath);
-			string reportPath = Path.Combine(config.StagingPath, $"{Path.GetFileName(modulePath)}-verification.txt");
+			var manifestReport = VerifyModuleManifest(modulePath);
+			var reportPath = Path.Combine(config.StagingPath, $"{Path.GetFileName(modulePath)}-verification.txt");
 			File.WriteAllText(reportPath, manifestReport);
 			artifacts.Add(reportPath);
 
 			// Create a README if it doesn't exist
-			string readmePath = Path.Combine(modulePath, "README.md");
+			var readmePath = Path.Combine(modulePath, "README.md");
 			if (!File.Exists(readmePath))
 			{
-				string readmeContent = GenerateDefaultReadme(Path.GetFileName(modulePath), version);
+				var readmeContent = GenerateDefaultReadme(Path.GetFileName(modulePath), version);
 				File.WriteAllText(readmePath, readmeContent);
 			}
 
@@ -395,7 +399,7 @@ public partial class ReleaseManager(
 
 		try
 		{
-			string content = File.ReadAllText(changelogPath);
+			var content = File.ReadAllText(changelogPath);
 
 			// Remove 'v' prefix if present in the version
 			if (version.StartsWith("v"))
@@ -404,19 +408,19 @@ public partial class ReleaseManager(
 			}
 
 			// Look for version heading pattern (# x.y.z or ## x.y.z)
-			string versionHeadingPattern = $@"(^|\n)#+\s+({version}|v{version}).*?(\n#+\s+|$)";
+			var versionHeadingPattern = $@"(^|\n)#+\s+({version}|v{version}).*?(\n#+\s+|$)";
 			var match = Regex.Match(content, versionHeadingPattern, RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
 			if (match.Success)
 			{
 				// Extract all text between this heading and the next heading
-				string sectionText = match.Value;
+				var sectionText = match.Value;
 
 				// Remove the heading itself
-				string notes = MyRegex().Replace(sectionText, "\n").Trim();
+				var notes = MyRegex().Replace(sectionText, "\n").Trim();
 
 				// Remove the next heading if it was captured
-				notes = Regex.Replace(notes, @"\n#+\s+.*?$", "").Trim();
+				notes = MyRegex1().Replace(notes, "").Trim();
 
 				if (!string.IsNullOrWhiteSpace(notes))
 				{
@@ -443,14 +447,14 @@ public partial class ReleaseManager(
 	{
 		_logger.LogInformation($"Verifying module manifest for {Path.GetFileName(modulePath)}");
 
-		string[] psd1Files = Directory.GetFiles(modulePath, "*.psd1", SearchOption.TopDirectoryOnly);
+		var psd1Files = Directory.GetFiles(modulePath, "*.psd1", SearchOption.TopDirectoryOnly);
 		if (psd1Files.Length == 0)
 		{
 			return "ERROR: No module manifest found";
 		}
 
-		string manifestPath = psd1Files[0];
-		string moduleName = Path.GetFileNameWithoutExtension(manifestPath);
+		var manifestPath = psd1Files[0];
+		var moduleName = Path.GetFileNameWithoutExtension(manifestPath);
 
 		var result = _commandRunner.RunCommand(
 			"powershell",
@@ -531,13 +535,13 @@ public partial class ReleaseManager(
 	{
 		using var sha256 = SHA256.Create();
 		using var stream = File.OpenRead(filePath);
-		byte[] hashBytes = sha256.ComputeHash(stream);
-		return BitConverter.ToString(hashBytes).Replace("-", "");
+		var hashBytes = sha256.ComputeHash(stream);
+		return Convert.ToHexString(hashBytes);
 	}
 
 	private static string GetContentType(string fileName)
 	{
-		string extension = Path.GetExtension(fileName).ToLowerInvariant();
+		var extension = Path.GetExtension(fileName).ToLowerInvariant();
 		return extension switch
 		{
 			".nupkg" => "application/octet-stream",
@@ -584,7 +588,7 @@ public partial class ReleaseManager(
 			_logger.LogInformation($"Creating PowerShell module {moduleName} v{moduleVersion}");
 
 			// Resolve the full module path
-			string fullModulePath = Path.GetFullPath(modulePath);
+			var fullModulePath = Path.GetFullPath(modulePath);
 			if (!Directory.Exists(fullModulePath))
 			{
 				Directory.CreateDirectory(fullModulePath);
@@ -626,7 +630,7 @@ public partial class ReleaseManager(
 			}
 
 			// Create a README.md file if it doesn't exist
-			string readmePath = Path.Combine(fullModulePath, "README.md");
+			var readmePath = Path.Combine(fullModulePath, "README.md");
 			if (!File.Exists(readmePath))
 			{
 				File.WriteAllText(readmePath, GenerateDefaultReadme(moduleName, moduleVersion));
@@ -668,14 +672,14 @@ public partial class ReleaseManager(
 				_commandRunner);
 
 			// Create function content from template
-			string functionContent = ModuleManifestGenerator.CreateFunctionTemplate(
+			var functionContent = ModuleManifestGenerator.CreateFunctionTemplate(
 				functionName,
 				description,
 				parameters
 			);
 
 			// Add the function to the module
-			string functionPath = manifestGenerator.AddFunction(
+			var functionPath = manifestGenerator.AddFunction(
 				modulePath,
 				functionName,
 				functionContent,
@@ -695,8 +699,14 @@ public partial class ReleaseManager(
 	[GeneratedRegex(@"(^|\n)#+\s+.*?\n")]
 	private static partial Regex MyRegex();
 
-	public string? CreatePowerShellModule(string modulePath, string moduleName, string moduleVersion, string description, string author = "", string companyName = "", Dictionary<string, string>? functions = null, Uri projectUri = null, string? licenseUri = null, IEnumerable<string>? tags = null)
+	/// <inheritdoc/>
+	public string? CreatePowerShellModule(string modulePath, string moduleName, string moduleVersion, string description, string author = "", string companyName = "", Dictionary<string, string>? functions = null, Uri? projectUri = null, string? licenseUri = null, IEnumerable<string>? tags = null) => throw new NotImplementedException();
+
+	public string? CreatePowerShellModule(string modulePath, string moduleName, string moduleVersion, string description, string author = "", string companyName = "", Dictionary<string, string>? functions = null, string? projectUri = null, Uri licenseUri = null, IEnumerable<string>? tags = null)
 	{
 		throw new NotImplementedException();
 	}
+
+	[GeneratedRegex(@"\n#+\s+.*?$")]
+	private static partial Regex MyRegex1();
 }

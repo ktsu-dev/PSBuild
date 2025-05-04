@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.Utilities;
 
 using System.Diagnostics;
@@ -94,7 +98,7 @@ public class CommandRunner(ILogger<CommandRunner> logger)
 		var result = RunCommand(fileName, arguments, workingDirectory);
 
 		return result.ExitCode != 0
-			?             throw new CommandFailedException(
+			? throw new CommandFailedException(
 				$"Command '{fileName} {arguments}' failed with exit code {result.ExitCode}",
 				result.ExitCode,
 				result.Output,
@@ -156,7 +160,12 @@ public class CommandFailedException(string message, int exitCode, string output,
 	/// Gets the standard error of the command.
 	/// </summary>
 	public string Error { get; } = error;
+	/// <inheritdoc/>
 	public CommandFailedException()
+	{
+	}
+	/// <inheritdoc/>
+	public CommandFailedException(string message) : base(message)
 	{
 	}
 }

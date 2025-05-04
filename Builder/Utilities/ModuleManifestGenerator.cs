@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.Utilities;
 
 using System.Text;
@@ -62,7 +66,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 		}
 
 		// Generate default values if not provided
-		int year = DateTime.Now.Year;
+		var year = DateTime.Now.Year;
 		author = string.IsNullOrEmpty(author) ? "PSBuild Authors" : author;
 		companyName = string.IsNullOrEmpty(companyName) ? author : companyName;
 		copyright = string.IsNullOrEmpty(copyright) ? $"(c) {year} {author}. All rights reserved." : copyright;
@@ -81,14 +85,14 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 		// Add required modules if specified
 		if (requiredModules != null && IsNotEmpty(requiredModules))
 		{
-			string modules = string.Join("', '", requiredModules);
+			var modules = string.Join("', '", requiredModules);
 			sbCommand.AppendLine($"    RequiredModules = @('{modules}')");
 		}
 
 		// Add exported functions if specified
 		if (functionsToExport != null && IsNotEmpty(functionsToExport))
 		{
-			string functions = string.Join("', '", functionsToExport);
+			var functions = string.Join("', '", functionsToExport);
 			sbCommand.AppendLine($"    FunctionsToExport = @('{functions}')");
 		}
 		else
@@ -99,7 +103,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 		// Add exported cmdlets if specified
 		if (cmdletsToExport != null && IsNotEmpty(cmdletsToExport))
 		{
-			string cmdlets = string.Join("', '", cmdletsToExport);
+			var cmdlets = string.Join("', '", cmdletsToExport);
 			sbCommand.AppendLine($"    CmdletsToExport = @('{cmdlets}')");
 		}
 		else
@@ -110,7 +114,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 		// Add exported variables if specified
 		if (variablesToExport != null && IsNotEmpty(variablesToExport))
 		{
-			string variables = string.Join("', '", variablesToExport);
+			var variables = string.Join("', '", variablesToExport);
 			sbCommand.AppendLine($"    VariablesToExport = @('{variables}')");
 		}
 		else
@@ -121,7 +125,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 		// Add exported aliases if specified
 		if (aliasesToExport != null && IsNotEmpty(aliasesToExport))
 		{
-			string aliases = string.Join("', '", aliasesToExport);
+			var aliases = string.Join("', '", aliasesToExport);
 			sbCommand.AppendLine($"    AliasesToExport = @('{aliases}')");
 		}
 		else
@@ -137,7 +141,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 
 			if (tags != null && IsNotEmpty(tags))
 			{
-				string tagList = string.Join("', '", tags);
+				var tagList = string.Join("', '", tags);
 				sbCommand.AppendLine($"            Tags = @('{tagList}')");
 			}
 
@@ -169,7 +173,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 			throw new InvalidOperationException($"Failed to create module manifest: {result.Error}");
 		}
 
-		string manifestPath = Path.Combine(modulePath, $"{moduleName}.psd1");
+		var manifestPath = Path.Combine(modulePath, $"{moduleName}.psd1");
 		_logger.LogInformation($"Module manifest created at {manifestPath}");
 
 		return manifestPath;
@@ -185,7 +189,7 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 	{
 		_logger.LogInformation($"Creating .psm1 file for {moduleName}");
 
-		string psm1Path = Path.Combine(modulePath, $"{moduleName}.psm1");
+		var psm1Path = Path.Combine(modulePath, $"{moduleName}.psm1");
 
 		// Create a basic .psm1 file
 		var sbContent = new StringBuilder();
@@ -252,13 +256,13 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 			description);
 
 		// Create a basic README.md file
-		string readmePath = Path.Combine(modulePath, "README.md");
-		string readmeContent = $"# {moduleName}\n\n{description}\n\n## Installation\n\n```powershell\nInstall-Module -Name {moduleName}\n```\n\n## Usage\n\n```powershell\nImport-Module {moduleName}\n```\n";
+		var readmePath = Path.Combine(modulePath, "README.md");
+		var readmeContent = $"# {moduleName}\n\n{description}\n\n## Installation\n\n```powershell\nInstall-Module -Name {moduleName}\n```\n\n## Usage\n\n```powershell\nImport-Module {moduleName}\n```\n";
 		File.WriteAllText(readmePath, readmeContent);
 
 		// Create a basic license file
-		string licensePath = Path.Combine(modulePath, "LICENSE.txt");
-		string licenseContent = $"MIT License\n\nCopyright (c) {DateTime.Now.Year}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
+		var licensePath = Path.Combine(modulePath, "LICENSE.txt");
+		var licenseContent = $"MIT License\n\nCopyright (c) {DateTime.Now.Year}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
 		File.WriteAllText(licensePath, licenseContent);
 
 		_logger.LogInformation($"Module structure created at {modulePath}");
@@ -280,8 +284,8 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 		string functionContent,
 		bool isPublic = true)
 	{
-		string folderName = isPublic ? "Public" : "Private";
-		string functionPath = Path.Combine(modulePath, folderName, $"{functionName}.ps1");
+		var folderName = isPublic ? "Public" : "Private";
+		var functionPath = Path.Combine(modulePath, folderName, $"{functionName}.ps1");
 
 		_logger.LogInformation($"Adding {folderName.ToLower(System.Globalization.CultureInfo.CurrentCulture)} function {functionName} to module");
 
@@ -345,10 +349,10 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 			sb.AppendLine("    [CmdletBinding()]");
 			sb.AppendLine("    param(");
 
-			int i = 0;
+			var i = 0;
 			foreach (var param in parameters)
 			{
-				bool isLast = i == parameters.Count - 1;
+				var isLast = i == parameters.Count - 1;
 				sb.AppendLine($"        [{param.Value}]");
 				sb.Append($"        ${param.Key}");
 
@@ -394,7 +398,10 @@ public class ModuleManifestGenerator(ILogger<ModuleManifestGenerator> logger, Co
 
 	private static bool IsNotEmpty<T>(IEnumerable<T> collection) => collection.GetEnumerator().MoveNext();
 
-	public string CreateModuleManifest(string modulePath, string moduleName, string moduleVersion, string description, string author = "", string companyName = "", string copyright = "", IEnumerable<string>? requiredModules = null, IEnumerable<string>? functionsToExport = null, IEnumerable<string>? cmdletsToExport = null, IEnumerable<string>? variablesToExport = null, IEnumerable<string>? aliasesToExport = null, Uri projectUri = null, string? licenseUri = null, IEnumerable<string>? tags = null)
+	/// <inheritdoc/>
+	public string CreateModuleManifest(string modulePath, string moduleName, string moduleVersion, string description, string author = "", string companyName = "", string copyright = "", IEnumerable<string>? requiredModules = null, IEnumerable<string>? functionsToExport = null, IEnumerable<string>? cmdletsToExport = null, IEnumerable<string>? variablesToExport = null, IEnumerable<string>? aliasesToExport = null, Uri? projectUri = null, string? licenseUri = null, IEnumerable<string>? tags = null) => throw new NotImplementedException();
+
+	public string CreateModuleManifest(string modulePath, string moduleName, string moduleVersion, string description, string author = "", string companyName = "", string copyright = "", IEnumerable<string>? requiredModules = null, IEnumerable<string>? functionsToExport = null, IEnumerable<string>? cmdletsToExport = null, IEnumerable<string>? variablesToExport = null, IEnumerable<string>? aliasesToExport = null, string? projectUri = null, Uri licenseUri = null, IEnumerable<string>? tags = null)
 	{
 		throw new NotImplementedException();
 	}

@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.VersionManagement;
 
 using System.Text;
@@ -51,16 +55,16 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 
 			// Latest commit reference
 			var latestCommit = repo.Head.Tip;
-			string shortSha = latestCommit.Sha[..7];
+			var shortSha = latestCommit.Sha[..7];
 
 			// Start with a default version
-			string version = "0.1.0";
-			bool isPreRelease = true;
+			var version = "0.1.0";
+			var isPreRelease = true;
 
 			if (latestVersionTag != null)
 			{
 				// Parse version from the tag (remove 'v' prefix if present)
-				string tagName = latestVersionTag.Tag.FriendlyName;
+				var tagName = latestVersionTag.Tag.FriendlyName;
 				version = tagName.StartsWith("v") ? tagName[1..] : tagName;
 
 				// Check if this commit is exactly at the tag (not a pre-release)
@@ -69,7 +73,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 				if (isPreRelease)
 				{
 					// Count commits since the tag
-					int commitsSinceTag = CountCommitsSinceTag(repo, latestVersionTag.Commit, latestCommit);
+					var commitsSinceTag = CountCommitsSinceTag(repo, latestVersionTag.Commit, latestCommit);
 
 					// Only increment the base version if there have been commits since the tag
 					if (commitsSinceTag > 0)
@@ -82,7 +86,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			else
 			{
 				// No valid version tag found, use commit count as the pre-release number
-				int commitCount = repo.Commits.Count();
+				var commitCount = repo.Commits.Count();
 				version = $"{version}-pre.{commitCount}";
 			}
 
@@ -197,7 +201,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 
 				foreach (var commit in commits)
 				{
-					string msg = commit.Message.Split('\n')[0].Trim().ToLower(System.Globalization.CultureInfo.CurrentCulture);
+					var msg = commit.Message.Split('\n')[0].Trim().ToLower(System.Globalization.CultureInfo.CurrentCulture);
 
 					if (msg.StartsWith("feat") || msg.StartsWith("add"))
 					{
@@ -332,22 +336,22 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 		try
 		{
 			// Update all .csproj files
-			string[] csprojFiles = Directory.GetFiles(repoPath, "*.csproj", SearchOption.AllDirectories);
-			foreach (string csprojFile in csprojFiles)
+			var csprojFiles = Directory.GetFiles(repoPath, "*.csproj", SearchOption.AllDirectories);
+			foreach (var csprojFile in csprojFiles)
 			{
 				UpdateVersionInCsprojFile(csprojFile, version);
 			}
 
 			// Update PowerShell module manifest if present
-			string[] psd1Files = Directory.GetFiles(repoPath, "*.psd1", SearchOption.AllDirectories);
-			foreach (string psd1File in psd1Files)
+			var psd1Files = Directory.GetFiles(repoPath, "*.psd1", SearchOption.AllDirectories);
+			foreach (var psd1File in psd1Files)
 			{
 				UpdateVersionInPsd1File(psd1File, version);
 			}
 
 			// Update AssemblyInfo.cs files if present
-			string[] assemblyInfoFiles = Directory.GetFiles(repoPath, "AssemblyInfo.cs", SearchOption.AllDirectories);
-			foreach (string assemblyInfoFile in assemblyInfoFiles)
+			var assemblyInfoFiles = Directory.GetFiles(repoPath, "AssemblyInfo.cs", SearchOption.AllDirectories);
+			foreach (var assemblyInfoFile in assemblyInfoFiles)
 			{
 				UpdateVersionInAssemblyInfoFile(assemblyInfoFile, version);
 			}
@@ -381,7 +385,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 		try
 		{
 			// Make sure version has a 'v' prefix
-			string tagName = version.StartsWith("v") ? version : $"v{version}";
+			var tagName = version.StartsWith("v") ? version : $"v{version}";
 
 			// If no message provided, create a default one
 			if (string.IsNullOrEmpty(message))
@@ -432,15 +436,15 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			var currentVersion = GetVersionFromGit(repoPath);
 
 			// Parse the base version (without pre-release part)
-			string baseVersion = currentVersion.Version.Split('-')[0];
+			var baseVersion = currentVersion.Version.Split('-')[0];
 
 			// Split into major.minor.patch
-			int[] versionParts = baseVersion.Split('.').Select(int.Parse).ToArray();
+			int[] versionParts = [.. baseVersion.Split('.').Select(int.Parse)];
 
 			// Ensure we have at least 3 parts
 			if (versionParts.Length < 3)
 			{
-				int[] newParts = new int[3];
+				var newParts = new int[3];
 				Array.Copy(versionParts, newParts, versionParts.Length);
 				versionParts = newParts;
 			}
@@ -451,14 +455,14 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 				versionParts[part]++;
 
 				// Reset lower parts to 0
-				for (int i = part + 1; i < 3; i++)
+				for (var i = part + 1; i < 3; i++)
 				{
 					versionParts[i] = 0;
 				}
 			}
 
 			// Construct the new version string
-			string newVersion = $"{versionParts[0]}.{versionParts[1]}.{versionParts[2]}";
+			var newVersion = $"{versionParts[0]}.{versionParts[1]}.{versionParts[2]}";
 
 			// Add pre-release suffix if provided
 			if (!string.IsNullOrEmpty(preRelease))
@@ -513,7 +517,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	private void UpdateChangelog(string repoPath, string version)
 	{
 		// Default changelog file path
-		string changelogPath = Path.Combine(repoPath, "CHANGELOG.md");
+		var changelogPath = Path.Combine(repoPath, "CHANGELOG.md");
 
 		// Get the previous tag to generate changes since then
 		string? previousTag = null;
@@ -532,21 +536,21 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 		}
 
 		// Generate changelog for the new version
-		string changes = GenerateChangelog(repoPath, previousTag);
+		var changes = GenerateChangelog(repoPath, previousTag);
 
 		// Create or update the changelog file
 		if (File.Exists(changelogPath))
 		{
-			string existingContent = File.ReadAllText(changelogPath);
-			string header = $"# {version} ({DateTime.Now:yyyy-MM-dd})";
-			string newChangelog = $"{header}\n\n{changes}\n\n{existingContent}";
+			var existingContent = File.ReadAllText(changelogPath);
+			var header = $"# {version} ({DateTime.Now:yyyy-MM-dd})";
+			var newChangelog = $"{header}\n\n{changes}\n\n{existingContent}";
 			File.WriteAllText(changelogPath, newChangelog);
 		}
 		else
 		{
-			string header = "# Changelog\n\n";
-			string versionHeader = $"# {version} ({DateTime.Now:yyyy-MM-dd})";
-			string newChangelog = $"{header}{versionHeader}\n\n{changes}\n";
+			var header = "# Changelog\n\n";
+			var versionHeader = $"# {version} ({DateTime.Now:yyyy-MM-dd})";
+			var newChangelog = $"{header}{versionHeader}\n\n{changes}\n";
 			File.WriteAllText(changelogPath, newChangelog);
 		}
 
@@ -562,27 +566,25 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	{
 		_logger.LogInformation($"Updating version in {csprojPath}");
 
-		string content = File.ReadAllText(csprojPath);
+		var content = File.ReadAllText(csprojPath);
 
 		// Update Version property
 		content = MyRegex().Replace(content, $"<Version>{version}</Version>");
 
 		// Update VersionPrefix if present
-		content = Regex.Replace(content,
-			@"<VersionPrefix>.*?</VersionPrefix>",
-			$"<VersionPrefix>{version.Split('-')[0]}</VersionPrefix>");
+		content = MyRegex1().Replace(content, $"<VersionPrefix>{version.Split('-')[0]}</VersionPrefix>");
 
 		// Update VersionSuffix if present and if version has a suffix
 		if (version.Contains('-'))
 		{
-			string suffix = version[(version.IndexOf('-') + 1)..];
+			var suffix = version[(version.IndexOf('-') + 1)..];
 			content = Regex.Replace(content,
 				@"<VersionSuffix>.*?</VersionSuffix>",
 				$"<VersionSuffix>{suffix}</VersionSuffix>");
 		}
 
 		// Update AssemblyVersion and FileVersion
-		string assemblyVersion = version.Split('-')[0];
+		var assemblyVersion = version.Split('-')[0];
 		content = Regex.Replace(content,
 			@"<AssemblyVersion>.*?</AssemblyVersion>",
 			$"<AssemblyVersion>{assemblyVersion}</AssemblyVersion>");
@@ -604,10 +606,10 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	{
 		_logger.LogInformation($"Updating version in {psd1Path}");
 
-		string content = File.ReadAllText(psd1Path);
+		var content = File.ReadAllText(psd1Path);
 
 		// Extract the base version without any pre-release suffix
-		string baseVersion = version.Split('-')[0];
+		var baseVersion = version.Split('-')[0];
 
 		// Update ModuleVersion
 		content = Regex.Replace(content,
@@ -627,10 +629,10 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	{
 		_logger.LogInformation($"Updating version in {assemblyInfoPath}");
 
-		string content = File.ReadAllText(assemblyInfoPath);
+		var content = File.ReadAllText(assemblyInfoPath);
 
 		// Extract the base version without any pre-release suffix
-		string baseVersion = version.Split('-')[0];
+		var baseVersion = version.Split('-')[0];
 
 		// Update AssemblyVersion
 		content = Regex.Replace(content,
@@ -659,8 +661,8 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	private static void AppendCommitToChangelog(StringBuilder changelog, Commit commit)
 	{
 		// Get the first line of the commit message for the changelog
-		string message = commit.Message.Split('\n')[0].Trim();
-		string shortSha = commit.Sha[..7];
+		var message = commit.Message.Split('\n')[0].Trim();
+		var shortSha = commit.Sha[..7];
 
 		// Replace common prefixes like "feat:", "fix:", etc.
 		message = Regex.Replace(message, @"^(feat|fix|docs|style|refactor|test|chore|ci|build|perf)(\([\w-]+\))?:\s*", "");
@@ -701,7 +703,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	/// <returns>The number of commits between the two commits.</returns>
 	private static int CountCommitsSinceTag(Repository repo, Commit fromCommit, Commit toCommit)
 	{
-		int count = 0;
+		var count = 0;
 		var filter = new CommitFilter
 		{
 			ExcludeReachableFrom = fromCommit,
@@ -725,15 +727,15 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 	private static string IncrementVersion(string version)
 	{
 		// Only use the base version, without any pre-release suffix
-		string baseVersion = version.Split('-')[0];
+		var baseVersion = version.Split('-')[0];
 
 		// Split into major.minor.patch
-		int[] versionParts = baseVersion.Split('.').Select(int.Parse).ToArray();
+		int[] versionParts = [.. baseVersion.Split('.').Select(int.Parse)];
 
 		// Ensure we have at least 3 parts
 		if (versionParts.Length < 3)
 		{
-			int[] newParts = new int[3];
+			var newParts = new int[3];
 			Array.Copy(versionParts, newParts, versionParts.Length);
 			versionParts = newParts;
 		}
@@ -765,10 +767,10 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			}
 
 			// Get module name from directory name
-			string moduleName = Path.GetFileName(modulePath);
+			var moduleName = Path.GetFileName(modulePath);
 
 			// Update module manifest (.psd1) file
-			string psd1Path = Path.Combine(modulePath, $"{moduleName}.psd1");
+			var psd1Path = Path.Combine(modulePath, $"{moduleName}.psd1");
 			if (File.Exists(psd1Path))
 			{
 				UpdateVersionInPsd1File(psd1Path, version);
@@ -780,8 +782,8 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			}
 
 			// Update PSBuild.psd1 file if it exists at the repo root
-			string repoRoot = Directory.GetParent(modulePath)?.FullName ?? modulePath;
-			string rootPsd1Path = Path.Combine(repoRoot, "PSBuild.psd1");
+			var repoRoot = Directory.GetParent(modulePath)?.FullName ?? modulePath;
+			var rootPsd1Path = Path.Combine(repoRoot, "PSBuild.psd1");
 			if (File.Exists(rootPsd1Path))
 			{
 				UpdateVersionInPsd1File(rootPsd1Path, version);
@@ -789,7 +791,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			}
 
 			// Update any PowerShell data files (.psd1) in the module directory
-			foreach (string psd1File in Directory.GetFiles(modulePath, "*.psd1", SearchOption.AllDirectories))
+			foreach (var psd1File in Directory.GetFiles(modulePath, "*.psd1", SearchOption.AllDirectories))
 			{
 				if (psd1File != psd1Path && psd1File != rootPsd1Path)
 				{
@@ -799,7 +801,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			}
 
 			// Update version in module script (.psm1) files if they contain version information
-			foreach (string psmFile in Directory.GetFiles(modulePath, "*.psm1", SearchOption.AllDirectories))
+			foreach (var psmFile in Directory.GetFiles(modulePath, "*.psm1", SearchOption.AllDirectories))
 			{
 				UpdateVersionInPsmFile(psmFile, version);
 				_logger.LogInformation($"Updated version in module script: {psmFile}");
@@ -809,7 +811,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			if (updateChangelog)
 			{
 				// Check for a CHANGELOG.md in the module directory or parent directory
-				string changelogPath = Path.Combine(modulePath, "CHANGELOG.md");
+				var changelogPath = Path.Combine(modulePath, "CHANGELOG.md");
 				if (!File.Exists(changelogPath))
 				{
 					changelogPath = Path.Combine(repoRoot, "CHANGELOG.md");
@@ -848,7 +850,7 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			return;
 		}
 
-		string content = File.ReadAllText(psmFilePath);
+		var content = File.ReadAllText(psmFilePath);
 
 		// Look for version declarations in comments or variables
 		// First look for version in comments
@@ -879,13 +881,13 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			return;
 		}
 
-		string content = File.ReadAllText(changelogPath);
+		var content = File.ReadAllText(changelogPath);
 		var sb = new StringBuilder();
 
 		// Add new version header if it doesn't exist
-		string versionHeader = $"## {version}";
-		string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
-		string fullHeader = $"## {version} - {dateStr}";
+		var versionHeader = $"## {version}";
+		var dateStr = DateTime.Now.ToString("yyyy-MM-dd");
+		var fullHeader = $"## {version} - {dateStr}";
 
 		if (!content.Contains(versionHeader))
 		{
@@ -896,8 +898,8 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 			sb.AppendLine();
 
 			// Get relevant commits for this version
-			string repoPath = Path.GetDirectoryName(Path.GetDirectoryName(changelogPath)) ?? "";
-			string changelog = "";
+			var repoPath = Path.GetDirectoryName(Path.GetDirectoryName(changelogPath)) ?? "";
+			var changelog = "";
 
 			try
 			{
@@ -935,6 +937,8 @@ public partial class VersionManager(ILogger<VersionManager> logger, CommandRunne
 
 	[GeneratedRegex(@"<Version>.*?</Version>")]
 	private static partial Regex MyRegex();
+	[GeneratedRegex(@"<VersionPrefix>.*?</VersionPrefix>")]
+	private static partial Regex MyRegex1();
 }
 
 /// <summary>

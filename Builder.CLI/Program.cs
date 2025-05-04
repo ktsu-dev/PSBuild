@@ -1,3 +1,7 @@
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
+
 namespace PSBuild.CLI;
 
 using System.CommandLine;
@@ -31,7 +35,7 @@ internal class Program
 		var versionGetCommand = new Command("get", "Get the current version information");
 		versionGetCommand.SetHandler(() =>
 		{
-			string workingDir = Directory.GetCurrentDirectory();
+			var workingDir = Directory.GetCurrentDirectory();
 			Console.WriteLine($"Getting version info from repository at: {workingDir}");
 
 			var versionManager = serviceProvider.GetRequiredService<VersionManager>();
@@ -50,7 +54,7 @@ internal class Program
 		// Use the Action<string> overload explicitly
 		versionSetCommand.SetHandler((Action<string>)((string version) =>
 		{
-			string workingDir = Directory.GetCurrentDirectory();
+			var workingDir = Directory.GetCurrentDirectory();
 			Console.WriteLine($"Setting version {version} in repository at: {workingDir}");
 
 			var versionManager = serviceProvider.GetRequiredService<VersionManager>();
@@ -80,7 +84,7 @@ internal class Program
 		// Use the Action<string> overload explicitly
 		buildCommand.SetHandler((Action<string>)((string configuration) =>
 		{
-			string workingDir = Directory.GetCurrentDirectory();
+			var workingDir = Directory.GetCurrentDirectory();
 			Console.WriteLine($"Building solution in {workingDir} with configuration {configuration}");
 
 			var buildManager = serviceProvider.GetRequiredService<BuildManager>();
